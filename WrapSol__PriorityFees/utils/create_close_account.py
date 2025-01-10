@@ -3,19 +3,21 @@ from solders.pubkey import Pubkey
 from solders.instruction import Instruction
 from solana.rpc.types import TokenAccountOpts
 from solders.instruction import AccountMeta
-from WrapSol__PriorityFees.utils.layouts import SWAP_LAYOUT
+from .layouts import SWAP_LAYOUT
 import json, requests
 LAMPORTS_PER_SOL = 1000000000
 AMM_PROGRAM_ID = Pubkey.from_string('675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8')
 SERUM_PROGRAM_ID = Pubkey.from_string('srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX')
 
 
-def make_swap_instruction(amount_in: int, token_account_in: Pubkey.from_string, token_account_out: Pubkey.from_string,
-                          accounts: dict, mint, ctx, owner) -> Instruction:
-    tokenPk = mint
-    accountProgramId = ctx.get_account_info_json_parsed(tokenPk)
-    TOKEN_PROGRAM_ID = accountProgramId.value.owner
+def make_swap_instruction(amount_in: int, token_account_in: Pubkey, token_account_out: Pubkey,
+                          accounts: dict, mint: Pubkey, ctx, owner) -> Instruction:
+    # Get the token program ID by querying account info
+    account_info = ctx.get_account_info(mint)
+    TOKEN_PROGRAM_ID = account_info.value.owner
+    print(TOKEN_PROGRAM_ID)
 
+    # Define accounts metadata required for the swap instruction
     keys = [
         AccountMeta(pubkey=TOKEN_PROGRAM_ID, is_signer=False, is_writable=False),
         AccountMeta(pubkey=accounts["amm_id"], is_signer=False, is_writable=True),
@@ -32,19 +34,22 @@ def make_swap_instruction(amount_in: int, token_account_in: Pubkey.from_string, 
         AccountMeta(pubkey=accounts["market_base_vault"], is_signer=False, is_writable=True),
         AccountMeta(pubkey=accounts["market_quote_vault"], is_signer=False, is_writable=True),
         AccountMeta(pubkey=accounts["market_authority"], is_signer=False, is_writable=False),
-        AccountMeta(pubkey=token_account_in, is_signer=False, is_writable=True),  # UserSourceTokenAccount
-        AccountMeta(pubkey=token_account_out, is_signer=False, is_writable=True),  # UserDestTokenAccount
-        AccountMeta(pubkey=owner.pubkey(), is_signer=True, is_writable=False)  # UserOwner
+        AccountMeta(pubkey=token_account_in, is_signer=False, is_writable=True),  # Source token account
+        AccountMeta(pubkey=token_account_out, is_signer=False, is_writable=True),  # Destination token account
+        AccountMeta(pubkey=owner.pubkey(), is_signer=True, is_writable=False),    # Owner of the account
     ]
 
+    # Build the instruction data using the SWAP_LAYOUT
     data = SWAP_LAYOUT.build(
         dict(
-            instruction=9,
-            amount_in=int(amount_in),
-            min_amount_out=0
+            instruction=9,    # Instruction code for token swap
+            amount_in=amount_in,
+            min_amount_out=0  # Minimum amount to receive, set to 0 for no slippage
         )
     )
-    return Instruction(AMM_PROGRAM_ID, data, keys)
+
+    # Return the constructed instruction
+    return Instruction(program_id=AMM_PROGRAM_ID, accounts=keys, data=data)
 
 
 def get_token_account(ctx,

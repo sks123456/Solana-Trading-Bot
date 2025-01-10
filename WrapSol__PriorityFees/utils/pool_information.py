@@ -4,13 +4,13 @@ from solana.rpc.types import MemcmpOpts
 import time
 from solana.rpc.commitment import Confirmed
 
-from WrapSol__PriorityFees.utils.layouts import AMM_INFO_LAYOUT_V4_1, MARKET_LAYOUT,get_offset
+from .layouts import AMM_INFO_LAYOUT_V4_1, MARKET_LAYOUT,get_offset
 from solders.pubkey import Pubkey
 import os
 from dotenv import load_dotenv
 
 # Load.env file
-# load_dotenv()
+load_dotenv()
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 RPC_HTTPS_URL= os.getenv("RPC_HTTPS_URL")
@@ -74,7 +74,7 @@ async def getpoolIdByMint(mint, ctx):
 
     else:
         memcmp_opts_base = MemcmpOpts(offset=400, bytes=str(mint))
-        # print(memcmp_opts_base)
+        print(memcmp_opts_base)
     filters_tokens = [memcmp_opts_base]
 
     while True:
@@ -85,7 +85,7 @@ async def getpoolIdByMint(mint, ctx):
 
             poolids = (await ctx.get_program_accounts(pubkey=RAY_V4, commitment=Confirmed, encoding="jsonParsed",
                                                       filters=filters_tokens)).value
-            # print(poolids)
+            print(poolids)
             break
         except :
             pass

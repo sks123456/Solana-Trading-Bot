@@ -11,24 +11,37 @@ from solana.rpc.api import Client
 from solders.keypair import Keypair
 from solders.compute_budget import set_compute_unit_price,set_compute_unit_limit
 
-from utils.create_close_account import   get_token_account, make_swap_instruction
-from utils.birdeye import getSymbol
+from utils.create_close_account import   get_token_account, make_swap_instruction, fetch_pool_keys
 from solana.rpc.async_api import AsyncClient
 from utils.pool_information import gen_pool, getpoolIdByMint
 import os
 from dotenv import load_dotenv
-
-
 # Load.env file
 load_dotenv()
 
-# config = dotenv_values(".env")
 
 RPC_HTTPS_URL= os.getenv("RPC_HTTPS_URL")
 solana_client = Client(os.getenv("RPC_HTTPS_URL"))
 
 async_solana_client = AsyncClient(os.getenv("RPC_HTTPS_URL"))
-payer=Keypair.from_base58_string(os.getenv("PrivateKey"))
+
+# Retrieve the private key from the environment
+private_key_str = os.getenv("PrivateKey")
+
+# Remove square brackets and any extra spaces
+private_key_str = private_key_str.strip("[]")
+
+# Convert the comma-separated string into a list of integers
+private_key_list = list(map(int, private_key_str.split(',')))
+
+# Ensure the private key is 64 bytes long
+if len(private_key_list) == 64:
+    # Convert the list of integers into a byte array (uint8 array)
+    private_key_bytes = bytes(private_key_list)
+
+    # Create the Keypair from the byte array
+    payer = Keypair.from_bytes(private_key_bytes)
+    
 Wsol_TokenAccount=os.getenv('WSOL_TokenAccount')
 
 
@@ -78,7 +91,7 @@ async def buy(solana_client, TOKEN_TO_SWAP_BUY, payer, amount):
     while retry_count < MAX_RETRIES:
         try:
             # Re-init transaction preparation
-            token_symbol, SOl_Symbol = getSymbol(TOKEN_TO_SWAP_BUY)
+            # token_symbol, SOl_Symbol = getSymbol(TOKEN_TO_SWAP_BUY)
             mint = Pubkey.from_string(TOKEN_TO_SWAP_BUY)
             # mint= TOKEN_TO_SWAP_BUY
 
@@ -86,18 +99,19 @@ async def buy(solana_client, TOKEN_TO_SWAP_BUY, payer, amount):
                 print("Fetching pool keys...")
 
 
-                tokenPool_ID = await getpoolIdByMint(mint, AsyncClient(RPC_HTTPS_URL, commitment=Confirmed))
-                print(tokenPool_ID)
-                if tokenPool_ID:
-                    print("AMMID FOUND")
+                # tokenPool_ID = await getpoolIdByMint(mint, AsyncClient(RPC_HTTPS_URL, commitment=Confirmed))
+                # print("found tokenPool")
+                # print(tokenPool_ID)
+                # if tokenPool_ID:
+                #     print("AMMID FOUND")
 
-                    fetch_pool_key = await gen_pool(str(tokenPool_ID), AsyncClient(RPC_HTTPS_URL, commitment=Confirmed))
-                    pool_keys = fetch_pool_key
-                else:
-                    print("AMMID NOT FOUND SEARCHING WILL BE FETCHING WITH RAYDIUM SDK")
+                #     fetch_pool_key = await gen_pool(str(tokenPool_ID), AsyncClient(RPC_HTTPS_URL, commitment=Confirmed))
+                #     pool_keys = fetch_pool_key
+                # else:
+                print("AMMID NOT FOUND SEARCHING WILL BE FETCHING WITH RAYDIUM SDK")
 
 
-                    #pool_keys = fetch_pool_keys(str(mint))
+                pool_keys = fetch_pool_keys(str(mint))
             except Exception as e:
                 print(e)
 
@@ -107,6 +121,7 @@ async def buy(solana_client, TOKEN_TO_SWAP_BUY, payer, amount):
             swap_associated_token_address, swap_token_account_Instructions = get_token_account(solana_client, payer.pubkey(), mint)
             swap_tx = []
             WSOL_token_account = Pubkey.from_string(Wsol_TokenAccount)
+            
             instructions_swap = make_swap_instruction(amount_in, WSOL_token_account, swap_associated_token_address, pool_keys, mint, solana_client, payer)
             if swap_token_account_Instructions != None:
 
@@ -128,6 +143,7 @@ async def buy(solana_client, TOKEN_TO_SWAP_BUY, payer, amount):
                 solana_client.get_latest_blockhash().value.blockhash,
             )
             print("Sending transaction...")
+            print(compiled_message)
             txn = await async_solana_client.send_transaction(
                 txn=VersionedTransaction(compiled_message, [payer]),
                 opts=TxOpts(skip_preflight=True),
@@ -184,8 +200,8 @@ async def main():
     #7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr
     #RUpbmGF6p42AAeN1QvhFReZejQry1cLkE1PUYFVVpnL
 
-    token_toBuy="3WdmE9BAHgVyB1JNswSUcj6RmkxnsvfJTd6RFnQ4pump"
+    token_toBuy="GJAFwWjJ3vnTsrQVabjBVK2TYB1YtRCQXRDfDgUnpump"
     print(payer.pubkey())
-    await buy(solana_client, token_toBuy, payer, 0.00065)
+    await buy(solana_client, token_toBuy, payer, 0.00005)
 
 asyncio.run(main())
